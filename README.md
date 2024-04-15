@@ -2,7 +2,7 @@
 
 This is the official repository for our paper "Detecting Abnormal Operations in Concentrated Solar Power Plants from Irregular Sequences of Thermal Images"
 
-> **Detecting Abnormal Operations in Concentrated Solar Power Plants from Irregular Sequences of Thermal Images**
+> **Detecting Abnormal Operations in Concentrated Solar Power Plants from Irregular Sequences of Thermal Images**  
 > Sukanya Patra, Nicolas Sournac, Souhaib Ben Taieb
 >
 > [[`Paper`](README.md)]

@@ -2,8 +2,8 @@
 
 This is the official repository for our paper "Detecting Abnormal Operations in Concentrated Solar Power Plants from Irregular Sequences of Thermal Images"
 
-> **Detecting Abnormal Operations in Concentrated Solar Power Plants from Irregular Sequences of Thermal Images**
-> Sukanya Patra, Nicolas Sournac, Souhaib Ben Taieb
+> **Detecting Abnormal Operations in Concentrated Solar Power Plants from Irregular Sequences of Thermal Images**  
+> Sukanya Patra, Nicolas Sournac, Souhaib Ben Taieb  
 > In Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining (KDD ’24)  
 > [[`Paper`](README.md)]
 

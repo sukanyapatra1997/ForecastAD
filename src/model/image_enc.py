@@ -191,7 +191,6 @@ class Autoencoder(nn.Module):
             x (torch.Tensor): input
 
         Returns:
-            enc (torch.Tensor): latent representation
             dec (torch.Tensor): regenerated input from latent representation
         """
 

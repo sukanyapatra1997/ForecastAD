@@ -3,6 +3,7 @@
 #
 # Created By  : Sukanya Patra
 # Created Date: 15-Jan-2024
+# Updated Date: 20-Jun-2024
 # version ='1.0'
 # ---------------------------------------------------------------------------
 # This file contains the code to train and test the forecast model.
@@ -21,6 +22,7 @@ from pathlib import Path
 from typing import Type
 from sklearn.metrics import (
     auc,
+    roc_auc_score,
     precision_recall_curve,
     roc_curve
 )
@@ -47,6 +49,7 @@ class ForecastTrainer():
         self.batch_size = config.settings['batch_size']
         self.weight_decay = config.settings['weight_decay']
         self.n_jobs_dataloader = config.settings['num_workers']
+        self.difffeature = config.settings['difffeature']
         self.device = config.settings['device']
 
         self.model_name = 'forecastmodel_' + config.settings['experiment']
@@ -69,22 +72,32 @@ class ForecastTrainer():
         repdim = self.config.settings['repdim']
         time_emb = repdim // 2
 
-        # Input dimension
-        lstm_input_dim = repdim + time_emb
+        indiff, outdiff = self.difffeature.split("_")
+        assert indiff in ['no', 'tau', 'delta', 'all']
 
-        # Output dimension
-        lstm_hidden_dim = repdim
-        lstm_proj_dim = repdim // 2
+        if indiff == 'no':
+            lstm_input_dim = repdim
+        else:
+            lstm_input_dim = repdim + time_emb
+
+        assert outdiff in ['no', 'tau', 'delta', 'all']
+        if outdiff == 'no':
+            lstm_proj_dim = repdim
+            lstm_hidden_dim = repdim + time_emb
+        else:
+            lstm_hidden_dim = repdim
+            lstm_proj_dim = repdim // 2
 
         model_args = {
             'lstm_input_dim': lstm_input_dim,
             'lstm_hidden_dim': lstm_hidden_dim,
             'lstm_proj_dim': lstm_proj_dim,
-            'lstm_num_layers': 2,
+            'lstm_num_layers': self.config.settings['llayers'] if 'llayers' in self.config.settings else 2,
             'seq_len': self.seq_len,
             'indim': indim,
             'repdim': repdim,
-            'time_emb': time_emb
+            'time_emb_in': time_emb,
+            'time_emb_out': time_emb,
         }
 
         self.logger.info(model_args)
@@ -148,7 +161,7 @@ class ForecastTrainer():
                                                                                                             target_startdiff.to(self.device)
 
 
-                pred_data = self.model(feature_data, feature_diff, feature_startdiff, target_diff, target_startdiff)
+                pred_data = self.model(feature_data, feature_diff, feature_startdiff, target_diff, target_startdiff, difffeature=self.difffeature)
 
                 score = torch.sum((pred_data - target_data) ** 2, dim=tuple(range(1, target_data.dim())))
                 loss = torch.mean(score)
@@ -159,9 +172,12 @@ class ForecastTrainer():
 
             avg_train_loss = sum(train_loss_batch) / len(train_loss_batch)
 
+            val_scores = []
+            val_labels = []
+
             with torch.no_grad():
                 for input in val_loader:
-                    feature_data, feature_diff, feature_startdiff, target_data, target_diff, target_startdiff, _, _ = input
+                    feature_data, feature_diff, feature_startdiff, target_data, target_diff, target_startdiff, _, labels = input
 
                     feature_data, feature_diff, feature_startdiff, target_data, target_diff, target_startdiff = feature_data.to(self.device),\
                                                                                                                 feature_diff.to(self.device),\
@@ -170,28 +186,34 @@ class ForecastTrainer():
                                                                                                                 target_diff.to(self.device),\
                                                                                                                 target_startdiff.to(self.device)
 
-                    pred_data = self.model(feature_data, feature_diff, feature_startdiff, target_diff, target_startdiff)
+                    pred_data = self.model(feature_data, feature_diff, feature_startdiff, target_diff, target_startdiff, difffeature=self.difffeature)
 
                     score = torch.sum((pred_data - target_data) ** 2, dim=tuple(range(1, target_data.dim())))
+
+                    val_scores.extend(score.cpu().data.numpy().tolist())
+                    val_labels.extend(labels.cpu().data.numpy().tolist())
+
                     loss = torch.mean(score)
 
                     val_loss_batch.append(loss.item())
 
             avg_val_loss = sum(val_loss_batch) / len(val_loss_batch)
+            val_auc = roc_auc_score(np.array(val_labels), np.array(val_scores))
 
-            self.logger.info("Epoch %d: train MSE %.4f, val MSE %.4f" % (epoch, avg_train_loss, avg_val_loss))
+
+            self.logger.info("Epoch %d: train MSE %.4f, val MSE %.4f, val AUC %.4f" % (epoch, avg_train_loss, avg_val_loss, val_auc))
 
             # Implement early stopping
             if self.early_stopping:
 
                 if epoch == 0 :
-                    min_loss = avg_val_loss
+                    max_auc = val_auc
                     best_model = copy.deepcopy(self.model)
                     patience_cnt = 0
                     continue
 
-                if avg_val_loss < min_loss:
-                    min_loss = avg_val_loss
+                if val_auc > max_auc:
+                    max_auc = val_auc
                     patience_cnt = 0
 
                     best_model = copy.deepcopy(self.model)
@@ -244,7 +266,7 @@ class ForecastTrainer():
                                                                                                             target_diff.to(self.device),\
                                                                                                             target_startdiff.to(self.device)
 
-                pred_data = self.model(feature_data, feature_diff, feature_startdiff, target_diff, target_startdiff)
+                pred_data = self.model(feature_data, feature_diff, feature_startdiff, target_diff, target_startdiff, difffeature=self.difffeature)
 
                 scores = torch.sum((pred_data - target_data) ** 2, dim=tuple(range(1, target_data.dim())))
                 loss = torch.mean(scores)

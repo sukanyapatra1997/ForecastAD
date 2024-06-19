@@ -3,6 +3,7 @@
 #
 # Created By  : Sukanya Patra
 # Created Date: 15-Jan-2024
+# Updated Date: 20-Jun-2024
 # version ='1.0'
 # ---------------------------------------------------------------------------
 # This file contains the base class for the CSP dataset
@@ -188,8 +189,12 @@ class CSP(Dataset):
             for idx, ts in enumerate(currtimeseq):
 
                 if idx == 0:
-                    prevtimestamp = ts
-                    continue
+                    if (datetime.date.fromtimestamp(ts/1000) == seq_date):
+                        prevtimestamp = ts
+                        continue
+                    else:
+                        INCORRPREV = True
+                        continue
 
                 if (datetime.date.fromtimestamp(ts/1000) == seq_date):
 
